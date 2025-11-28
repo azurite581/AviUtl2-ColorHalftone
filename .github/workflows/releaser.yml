@@ -1,0 +1,65 @@
+name: Release
+
+run-name: Release
+on:
+  push:
+    tags:
+    - "v[0-9]+.[0-9]+.[0-9]+"
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  release:
+    name: Release
+    runs-on: windows-latest
+
+    permissions:
+      contents: write
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v6
+      with:
+        fetch-depth: 0
+
+    - name: Restore aulua
+      id: cache-restore-aulua
+      uses: actions/cache/restore@v4
+      with:
+        path: aulua.zip
+        key: aulua-${{runner.os}}
+
+    - name: Download aulua
+      if: steps.cache-restore-aulua.outputs.cache-hit != 'true'
+      run: |
+        curl -L \
+        -o aulua.zip \
+        https://github.com/karoterra/aviutl2-aulua/releases/download/v0.3.0/aulua-v0.3.0-windows.zip
+
+    - name: Cache aulua
+      if: steps.cache-restore-aulua.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v4
+      with:
+        path: aulua.zip
+        key: aulua-${{runner.os}}
+
+    - name: Build script
+      run: |
+        mkdir aulua
+        unzip aulua.zip -d aulua
+        aulua/aulua.exe build
+
+    - name: Create zip archive
+      run: |
+        mv build/* .
+        7z a "ColorHalftone_${VERSION}.zip" *.anm2 README.md LICENSE.txt
+      env:
+        VERSION: ${{github.ref_name}}
+
+    - name: Create release notes
+      run: gh release create "${VERSION}" --generate-notes "ColorHalftone_${VERSION}.zip"
+      env:
+        VERSION: ${{github.ref_name}}
+        GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}

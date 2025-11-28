@@ -1,0 +1,17 @@
+project:
+  variables:
+    AUTHOR: azurite
+
+build:
+  out_dir: build
+
+install:
+  out_dir:
+
+scripts:
+  - name: カラーハーフトーン.anm2
+    sources:
+      - path: script/カラーハーフトーン.in.anm2
+        variables:
+          VERSION: v1.0.0
+          INFO: カラーハーフトーン

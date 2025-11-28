@@ -1,0 +1,220 @@
+--information:${INFO} ${VERSION} by ${AUTHOR}
+--label:加工
+---$track:サイズ
+---min=0
+---max=100
+---step=0.01
+local size = 50
+
+---$track:ドットサイズ
+---min=0
+---max=200
+---step=0.01
+local dot_size = 100
+
+--track0:X,-4000,4000,0,0.01
+--track1:Y,-4000,4000,0,0.01
+---$track:回転
+---min=-180
+---max=180
+---step=0.01
+local angle = 0
+
+---$track:ドット回転
+---min=-180
+---max=180
+---step=0.01
+local dot_angle = 0
+
+---$track:滑らかさ
+---min=0
+---max=5
+---step=1
+local smoothness = 1
+
+---$select:形状
+---円=0
+---四角形=1
+---三角形=2
+---五角形=3
+---六角形=4
+---星形=5
+---ハート=6
+---線=7
+local shape = 0
+
+---$check:段違い
+local offset_type = 0
+
+---$check:背景色透過
+local bg_transparent = 0
+
+---$check:色1表示
+local col1_visible = 1
+
+---$color:色1
+local col1 = 0x00ffff
+
+---$track:色1スクリーン角度
+---min=-180
+---max=180
+---step=0.01
+local col1_screen_angle = 75
+
+---$check:色2表示
+local col2_visible = 1
+
+---$color:色2
+local col2 = 0xff00ff
+
+---$track:色2スクリーン角度
+---min=-180
+---max=180
+---step=0.01
+local col2_screen_angle = 15
+
+---$check:色3表示
+local col3_visible = 1
+
+---$color:色3
+local col3 = 0xffff00
+
+---$track:色3スクリーン角度
+---min=-180
+---max=180
+---step=0.01
+local col3_screen_angle = 60
+
+---$value:PI
+local PI = {}
+
+--[[pixelshader@psmain:
+---$include "ColorHalftone.hlsl"
+]]
+
+local function rotate(deg)
+    local rad = math.rad(deg)
+    return {math.cos(rad), -math.sin(rad),
+            math.sin(rad),  math.cos(rad)}
+end
+
+local function as_number(x, d)
+	if type(x) == "boolean" then return x and 1 or 0
+    elseif type(x) == "number" then return x ~= 0 and 1 or 0
+	else return d end
+end
+
+local function to_number_from_table(t, idx, d)
+    if type(t) ~= "table" then return d end
+    return tonumber(t[idx]) or d
+end
+
+local function to_number_from_2d_table(t, row, col, d)
+    if type(t) ~= "table" then return d end
+    if type(t[row]) ~= "table" then return d end
+    return tonumber(t[row][col]) or d
+end
+
+if obj.w * obj.h == 0 then
+    return
+end
+
+local n = obj.setanchor("track", 0, "line")
+
+size = tonumber(PI[1]) or size
+local col1_dot_size = to_number_from_table(PI[2], 1, dot_size)
+local col2_dot_size = to_number_from_table(PI[2], 2, dot_size)
+local col3_dot_size = to_number_from_table(PI[2], 3, dot_size)
+local col1_x = to_number_from_2d_table(PI[3], 1, 1, obj.track0)
+local col1_y = to_number_from_2d_table(PI[3], 1, 2, obj.track1)
+local col2_x = to_number_from_2d_table(PI[3], 2, 1, obj.track0)
+local col2_y = to_number_from_2d_table(PI[3], 2, 2, obj.track1)
+local col3_x = to_number_from_2d_table(PI[3], 3, 1, obj.track0)
+local col3_y = to_number_from_2d_table(PI[3], 3, 2, obj.track1)
+col1_screen_angle = to_number_from_table(PI[4], 1, col1_screen_angle + angle)
+col2_screen_angle = to_number_from_table(PI[4], 2, col2_screen_angle + angle)
+col3_screen_angle = to_number_from_table(PI[4], 3, col3_screen_angle + angle)
+local col1_dot_angle = to_number_from_table(PI[5], 1, dot_angle)
+local col2_dot_angle = to_number_from_table(PI[5], 2, dot_angle)
+local col3_dot_angle = to_number_from_table(PI[5], 3, dot_angle)
+col1_visible = (type(PI[6]) == "table") and as_number(PI[6][1], col1_visible) or col1_visible
+col2_visible = (type(PI[6]) == "table") and as_number(PI[6][2], col2_visible) or col2_visible
+col3_visible = (type(PI[6]) == "table") and as_number(PI[6][3], col3_visible) or col3_visible
+col1 = to_number_from_table(PI[7], 1, col1)
+col2 = to_number_from_table(PI[7], 2, col2)
+col3 = to_number_from_table(PI[7], 3, col3)
+smoothness = tonumber(PI[8]) or smoothness
+shape = tonumber(PI[9]) or shape
+offset_type = as_number(PI[10], offset_type)
+bg_transparent = as_number(PI[11], bg_transparent)
+
+size = math.max(0, size)
+dot_size = math.max(0, dot_size)
+smoothness = math.max(0, math.min(5, smoothness))
+shape = (0 <= shape and shape < 8) and shape or 0
+
+if shape == 1 then
+    col1_dot_angle = col1_dot_angle + 45
+    col2_dot_angle = col2_dot_angle + 45
+    col3_dot_angle = col3_dot_angle + 45
+elseif shape == 2 then
+    col1_dot_angle = col1_dot_angle + 60
+    col2_dot_angle = col2_dot_angle + 60
+    col3_dot_angle = col3_dot_angle + 60
+elseif shape == 4 then
+    col1_dot_angle = col1_dot_angle + 30
+    col2_dot_angle = col2_dot_angle + 30
+    col3_dot_angle = col3_dot_angle + 30
+elseif shape == 5 then
+    col1_dot_angle = col1_dot_angle + 36
+    col2_dot_angle = col2_dot_angle + 36
+    col3_dot_angle = col3_dot_angle + 36
+elseif shape == 6 then
+    col1_dot_angle = col1_dot_angle + 180
+    col2_dot_angle = col2_dot_angle + 180
+    col3_dot_angle = col3_dot_angle + 180
+end
+
+local col1_s_m00, col1_s_m01, col1_s_m10, col1_s_m11 = unpack(rotate(col1_screen_angle));
+local col1_d_m00, col1_d_m01, col1_d_m10, col1_d_m11 = unpack(rotate(col1_dot_angle));
+local col2_s_m00, col2_s_m01, col2_s_m10, col2_s_m11 = unpack(rotate(col2_screen_angle));
+local col2_d_m00, col2_d_m01, col2_d_m10, col2_d_m11 = unpack(rotate(col2_dot_angle));
+local col3_s_m00, col3_s_m01, col3_s_m10, col3_s_m11 = unpack(rotate(col3_screen_angle));
+local col3_d_m00, col3_d_m01, col3_d_m10, col3_d_m11 = unpack(rotate(col3_dot_angle));
+local aspect = obj.w / obj.h
+size = obj.w * 0.25 * ((100 - size) / 100)
+local r1, g1, b1 = RGB(col1)
+local r2, g2, b2 = RGB(col2)
+local r3, g3, b3 = RGB(col3)
+local PAD = 0.0
+
+obj.effect("ぼかし", "範囲", smoothness, "縦横比", 0, "光の強さ", 0, "サイズ固定", 1)
+obj.pixelshader("psmain", "object", {"object"},
+    {
+        obj.w, obj.h, aspect, size,
+        shape, col1_dot_size / 100, col2_dot_size / 100, col3_dot_size / 100,
+
+        col1_x, col1_y, col2_x, col2_y,
+        col3_x, col3_y, offset_type, bg_transparent,
+
+        col1_s_m00, col1_s_m01, PAD, PAD,
+        col1_s_m10, col1_s_m11, PAD, PAD,
+        col1_d_m00, col1_d_m01, PAD, PAD,
+        col1_d_m10, col1_d_m11, PAD, PAD,
+
+        col2_s_m00, col2_s_m01, PAD, PAD,
+        col2_s_m10, col2_s_m11, PAD, PAD,
+        col2_d_m00, col2_d_m01, PAD, PAD,
+        col2_d_m10, col2_d_m11, PAD, PAD,
+
+        col3_s_m00, col3_s_m01, PAD, PAD,
+        col3_s_m10, col3_s_m11, PAD, PAD,
+        col3_d_m00, col3_d_m01, PAD, PAD,
+        col3_d_m10, col3_d_m11, PAD, PAD,
+
+        r1 / 255, g1 / 255, b1 / 255, col1_visible,
+        r2 / 255, g2 / 255, b2 / 255, col2_visible,
+        r3 / 255, g3 / 255, b3 / 255, col3_visible,
+    },
+    "copy", "clamp"
+)
