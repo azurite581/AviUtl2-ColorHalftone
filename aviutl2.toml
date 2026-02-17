@@ -1,0 +1,20 @@
+#:schema ./.aviutl2-cli/aviutl2.schema.json
+# 設定ファイルについては https://github.com/sevenc-nanashi/aviutl2-cli を参照してください。
+[project]
+name = "AviUtl2-ColorHalftone"
+version = "1.1.0"
+
+[artifacts.ColorHalftone_anm2]
+build = "cd ./script && aulua build"
+source = "./out_script/カラーハーフトーン.anm2"
+destination = "Script/カラーハーフトーン.anm2"
+
+[development]
+aviutl2_version = "latest"
+
+[preview]
+
+[release]
+# package_template = "package_template.txt"
+# prebuild = "echo prebuild"
+# postbuild = "echo postbuild"
