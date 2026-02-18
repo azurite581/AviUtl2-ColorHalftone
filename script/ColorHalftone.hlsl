@@ -143,8 +143,11 @@ float4 halftone(in float2 p, in int channel, in float dot_size, in float2 center
 
     float min_d = 1e20;
     float size = 0.0;
-    for(int y = -1; y <= 1; y++)
-    for(int x = -1; x <= 1; x++)
+    float shape_size = 0.0;
+    int search_range = (int)ceil(dot_size * 1.5 + fusion * 0.5);
+    search_range = clamp(search_range, 1, 3);
+    for(int y = -search_range; y <= search_range; y++)
+    for(int x = -search_range; x <= search_range; x++)
     {
         float2 rid = id + float2(x, y);
         float2 pos_in_st = rid * s;
@@ -284,6 +287,9 @@ float4 halftone(in float2 p, in int channel, in float dot_size, in float2 center
             }
         }
 
+        if (d < min_d) {
+            shape_size = size;
+        }
         min_d = smin(min_d, d, fusion);
     }
 
@@ -291,11 +297,11 @@ float4 halftone(in float2 p, in int channel, in float dot_size, in float2 center
     float aa_width = length(float2(ddx(st.x), ddy(st.x)));
     float blend = 0.0;
     if (shape == 7) {
-        blend = smoothThreshold(size, 0.5 * s, aa_width, min_d);
+        blend = smoothThreshold(shape_size * dot_size, 0.5 * s, aa_width, min_d);
     } else {
         static const float AA_WIDTH_FACTOR = 1.2;
         blend = smoothstep(-aa_width, aa_width, min_d);
-        float opacity = smoothstep(0.0, aa_width * AA_WIDTH_FACTOR, size);
+        float opacity = smoothstep(0.0, aa_width * AA_WIDTH_FACTOR, shape_size * dot_size);
         blend = 1.0 - (1.0 - blend) * opacity;
     }
     return lerp(dot_col, bg_col, blend);
