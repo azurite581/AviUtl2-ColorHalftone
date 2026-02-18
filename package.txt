@@ -1,3 +1,21 @@
+[ 概要 ]
+
+AviUtl2 用のカラーハーフトーンスクリプト。
+
+[ インストールされるファイル ]
+
+・ColorHalftone.anm2
+カラーハーフトーンスクリプト
+
+・English.ColorHalftone.aul2
+翻訳ファイル（英語）
+
+[ 使い方 ]
+
+GitHub リポジトリ(https://github.com/azurite581/AviUtl2-ColorHalftone) を参照してください。
+
+[ ライセンス ]
+
 MIT License
 
 Copyright (c) 2025-2026 azurite

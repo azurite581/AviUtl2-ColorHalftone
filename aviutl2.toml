@@ -6,8 +6,12 @@ version = "1.1.0"
 
 [artifacts.ColorHalftone_anm2]
 build = "cd ./script && aulua build"
-source = "./out_script/カラーハーフトーン.anm2"
-destination = "Script/カラーハーフトーン.anm2"
+source = "./out_script/ColorHalftone.anm2"
+destination = "Script/ColorHalftone.anm2"
+
+[artifacts.English_ColorHalftone_aul2]
+source = "./translations/English.ColorHalftone.aul2"
+destination = "Language/English.ColorHalftone.aul2"
 
 [development]
 aviutl2_version = "latest"
@@ -15,6 +19,7 @@ aviutl2_version = "latest"
 [preview]
 
 [release]
-# package_template = "package_template.txt"
-# prebuild = "echo prebuild"
-# postbuild = "echo postbuild"
+package_template = "package.txt"
+output_dir = "release"
+zip_name = "{name}-v{version}"
+include = ["ColorHalftone_anm2", "English_ColorHalftone_aul2"]

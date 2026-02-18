@@ -15,14 +15,14 @@ local dot_size = 100
 --track0:X,-4000,4000,0,0.01
 --track1:Y,-4000,4000,0,0.01
 ---$track:回転
----min=-180
----max=180
+---min=-360
+---max=360
 ---step=0.01
 local angle = 0
 
 ---$track:ドット回転
----min=-180
----max=180
+---min=-360
+---max=360
 ---step=0.01
 local dot_angle = 0
 
@@ -32,13 +32,19 @@ local dot_angle = 0
 ---step=1
 local smoothness = 1
 
+---$track:融合度
+---min=0
+---max=100
+---step=1
+local fusion = 0
+
 ---$select:形状
 ---円=0
 ---四角形=1
 ---三角形=2
 ---五角形=3
 ---六角形=4
----星形=5
+---星型=5
 ---ハート=6
 ---線=7
 local shape = 0
@@ -49,44 +55,52 @@ local offset_type = 0
 ---$check:背景色透過
 local bg_transparent = 0
 
+--group:表示,true
 ---$check:色1表示
 local col1_visible = 1
-
----$color:色1
-local col1 = 0x00ffff
-
----$track:色1スクリーン角度
----min=-180
----max=180
----step=0.01
-local col1_screen_angle = 75
 
 ---$check:色2表示
 local col2_visible = 1
 
----$color:色2
-local col2 = 0xff00ff
-
----$track:色2スクリーン角度
----min=-180
----max=180
----step=0.01
-local col2_screen_angle = 15
-
 ---$check:色3表示
 local col3_visible = 1
+
+--group
+--group:色,true
+---$color:色1
+local col1 = 0x00ffff
+
+---$color:色2
+local col2 = 0xff00ff
 
 ---$color:色3
 local col3 = 0xffff00
 
+--group
+--group:スクリーン角度,true
+---$track:色1スクリーン角度
+---min=-360
+---max=360
+---step=0.01
+local col1_screen_angle = 75
+
+---$track:色2スクリーン角度
+---min=-360
+---max=360
+---step=0.01
+local col2_screen_angle = 15
+
 ---$track:色3スクリーン角度
----min=-180
----max=180
+---min=-360
+---max=360
 ---step=0.01
 local col3_screen_angle = 60
 
+--group
+--group:その他,false
 ---$value:PI
 local PI = {}
+--group
 
 --[[pixelshader@psmain:
 ---$include "ColorHalftone.hlsl"
@@ -144,10 +158,10 @@ col1 = to_number_from_table(PI[7], 1, col1)
 col2 = to_number_from_table(PI[7], 2, col2)
 col3 = to_number_from_table(PI[7], 3, col3)
 smoothness = tonumber(PI[8]) or smoothness
-shape = tonumber(PI[9]) or shape
-offset_type = as_number(PI[10], offset_type)
-bg_transparent = as_number(PI[11], bg_transparent)
-
+fusion = math.max(0, tonumber(PI[9]) or fusion)
+shape = tonumber(PI[10]) or shape
+offset_type = as_number(PI[11], offset_type)
+bg_transparent = as_number(PI[12], bg_transparent)
 size = math.max(0, size)
 dot_size = math.max(0, dot_size)
 smoothness = math.max(0, math.min(5, smoothness))
@@ -196,6 +210,7 @@ obj.pixelshader("psmain", "object", {"object"},
 
         col1_x, col1_y, col2_x, col2_y,
         col3_x, col3_y, offset_type, bg_transparent,
+        fusion / 100, PAD, PAD, PAD,
 
         col1_s_m00, col1_s_m01, PAD, PAD,
         col1_s_m10, col1_s_m11, PAD, PAD,

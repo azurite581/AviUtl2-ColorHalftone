@@ -6,14 +6,11 @@ on:
     tags:
     - "v[0-9]+.[0-9]+.[0-9]+"
 
-defaults:
-  run:
-    shell: bash
-
 jobs:
   release:
     name: Release
     runs-on: windows-latest
+    timeout-minutes: 10
 
     permissions:
       contents: write
@@ -24,42 +21,104 @@ jobs:
       with:
         fetch-depth: 0
 
+    - name: Get aulua latest tag name
+      id: aulua_latest_tag
+      run: |
+        $tag = gh release view --repo karoterra/aviutl2-aulua --json tagName --jq .tagName
+        "name=$tag" >> $env:GITHUB_OUTPUT
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
     - name: Restore aulua
-      id: cache-restore-aulua
-      uses: actions/cache/restore@v4
+      id: restore-aulua
+      uses: actions/cache/restore@v5
       with:
-        path: aulua.zip
-        key: aulua-${{runner.os}}
+        path: ./aulua
+        key: aulua-${{ steps.aulua_latest_tag.outputs.name }}
 
     - name: Download aulua
-      if: steps.cache-restore-aulua.outputs.cache-hit != 'true'
-      run: |
-        curl -L \
-        -o aulua.zip \
-        https://github.com/karoterra/aviutl2-aulua/releases/download/v0.3.0/aulua-v0.3.0-windows.zip
+      if: steps.restore-aulua.outputs.cache-hit != 'true'
+      uses: robinraju/release-downloader@v1
+      with:
+        repository: "karoterra/aviutl2-aulua"
+        latest: true
+        fileName: '*.zip'
+        out-file-path: "aulua"
+        extract: true
 
     - name: Cache aulua
-      if: steps.cache-restore-aulua.outputs.cache-hit != 'true'
+      if: steps.restore-aulua.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v5
+      with:
+        path: ./aulua
+        key: aulua-${{ steps.aulua_latest_tag.outputs.name }}
+
+    - name: add aulua to the PATH
+      run: |
+        cd .\aulua
+        echo "$PWD" >> $env:GITHUB_PATH
+
+    - name: Get aviutl2-cli latest tag name
+      id: aviutl2-cli_latest_tag
+      run: |
+        $tag = gh release view --repo sevenc-nanashi/aviutl2-cli --json tagName --jq .tagName
+        "name=$tag" >> $env:GITHUB_OUTPUT
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Restore aviutl2-cli
+      id: restore-aviutl2-cli
+      uses: actions/cache/restore@v5
+      with:
+        path: ./aviutl2-cli
+        key: aviutl2-cli-${{ steps.aviutl2-cli_latest_tag.outputs.name }}
+
+    - name: Download aviutl2-cli
+      if: steps.restore-aviutl2-cli.outputs.cache-hit != 'true'
+      uses: robinraju/release-downloader@v1
+      with:
+        repository: "sevenc-nanashi/aviutl2-cli"
+        latest: true
+        fileName: '*.exe'
+        out-file-path: "aviutl2-cli"
+
+    - name: Cache aviutl2-cli
+      if: steps.restore-aviutl2-cli.outputs.cache-hit != 'true'
       uses: actions/cache/save@v4
       with:
-        path: aulua.zip
-        key: aulua-${{runner.os}}
+        path: ./aviutl2-cli
+        key: aviutl2-cli-${{ steps.aviutl2-cli_latest_tag.outputs.name }}
 
-    - name: Build script
+    - name: add aviutl2-cli to the PATH
       run: |
-        mkdir aulua
-        unzip aulua.zip -d aulua
-        aulua/aulua.exe build
+        cd .\aviutl2-cli
+        Copy-Item *.exe au2.exe
+        echo "$PWD" >> $env:GITHUB_PATH
 
-    - name: Create zip archive
+    - name: Extract version
+      id: extract-version
       run: |
-        mv build/* .
-        7z a "ColorHalftone_${VERSION}.zip" *.anm2 README.md LICENSE.txt
+        $version = "${{ github.ref_name }}".TrimStart('v')
+        echo "version=$version" >> $env:GITHUB_OUTPUT
+
+    - name: Build
+      run: |
+        mkdir release
+        au2 release --set-version "$env:VERSION"
       env:
-        VERSION: ${{github.ref_name}}
+        VERSION: ${{ steps.extract-version.outputs.version }}
+
+    - name: Extract a specific version from the Changelog
+      run: |
+        cd .\tool
+        dotnet ChangelogExtract.cs -- ..\CHANGELOG.md ..\EXTRACTED.md --semver "$env:VERSION"
+      env:
+        VERSION: ${{ steps.extract-version.outputs.version }}
 
     - name: Create release notes
-      run: gh release create "${VERSION}" --generate-notes "ColorHalftone_${VERSION}.zip"
+      run: |
+        Move-Item -Path release\*.au2pkg.zip -Destination .\
+        gh release create "$env:VERSION" --notes-file EXTRACTED.md "*.au2pkg.zip"
       env:
-        VERSION: ${{github.ref_name}}
-        GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
+        VERSION: ${{ github.ref_name }}
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -13,6 +13,8 @@ cbuffer constant0 : register(b0) {
     float2 col3_center_pos;
     float offset_type;
     float bg_transparent;
+    float fusion;
+    float3 pad;
     float2x2 col1_screen_angle;
     float2x2 col1_dot_angle;
     float2x2 col2_screen_angle;
@@ -120,6 +122,13 @@ float smoothThreshold(in float shape_size, in float max_shape_size, in float w, 
     return smoothstep(edge0, edge1, d);
 }
 
+// Polynomial smooth minimum by iq
+float smin(float a, float b, float k) {
+    if (k <= 0.0) return min(a, b);
+    float h = clamp(0.5 + 0.5 * (b-a) / k, 0.0, 1.0);
+    return lerp(b, a, h) - k * h * (1.0 - h);
+}
+
 float4 halftone(in float2 p, in int channel, in float dot_size, in float2 center_pos, in float2x2 screen_angle, in float2x2 dot_angle, in float3 dot_col_, in float use_offset)
 {
     static const float s = 1.0;  // 周期
@@ -133,7 +142,7 @@ float4 halftone(in float2 p, in int channel, in float dot_size, in float2 center
     float2 id = round(st / s);
 
     float min_d = 1e20;
-    float shape_size = 0.0;
+    float size = 0.0;
     for(int y = -1; y <= 1; y++)
     for(int x = -1; x <= 1; x++)
     {
@@ -171,7 +180,7 @@ float4 halftone(in float2 p, in int channel, in float dot_size, in float2 center
         }
 
         value = clamp(value, 0.0, 1.0);
-        float size = sqrt(value) * 0.5 * s;
+        size = sqrt(value) * 0.5 * s;
 
         float d = 1e20;
         switch (shape) {
@@ -275,21 +284,18 @@ float4 halftone(in float2 p, in int channel, in float dot_size, in float2 center
             }
         }
 
-        if (d < min_d) {
-            min_d = d;
-            shape_size = size;
-        }
+        min_d = smin(min_d, d, fusion);
     }
 
     // アンチエイリアス
     float aa_width = length(float2(ddx(st.x), ddy(st.x)));
     float blend = 0.0;
     if (shape == 7) {
-        blend = smoothThreshold(shape_size, 0.5 * s, aa_width, min_d);
+        blend = smoothThreshold(size, 0.5 * s, aa_width, min_d);
     } else {
         static const float AA_WIDTH_FACTOR = 1.2;
         blend = smoothstep(-aa_width, aa_width, min_d);
-        float opacity = smoothstep(0.0, aa_width * AA_WIDTH_FACTOR, shape_size);
+        float opacity = smoothstep(0.0, aa_width * AA_WIDTH_FACTOR, size);
         blend = 1.0 - (1.0 - blend) * opacity;
     }
     return lerp(dot_col, bg_col, blend);

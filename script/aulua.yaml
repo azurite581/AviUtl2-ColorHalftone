@@ -9,9 +9,9 @@ install:
   out_dir:
 
 scripts:
-  - name: カラーハーフトーン.anm2
+  - name: ColorHalftone.anm2
     sources:
-      - path: カラーハーフトーン.in.anm2
+      - path: ColorHalftone.in.anm2
         variables:
           VERSION: v1.1.0
-          INFO: カラーハーフトーン
+          INFO: ColorHalftone
