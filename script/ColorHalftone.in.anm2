@@ -1,7 +1,7 @@
 --information:${INFO} ${VERSION} by ${AUTHOR}
 --label:加工
 ---$track:サイズ
----min=0
+---min=1
 ---max=100
 ---step=0.01
 local size = 50
@@ -49,13 +49,30 @@ local fusion = 0
 ---線=7
 local shape = 0
 
+---$select:混色方法
+---減法混色=0
+---加法混色=1
+local mixing_mode = 0
+
 ---$check:段違い
 local offset_type = 0
 
----$check:背景色透過
-local bg_transparent = 0
+--group
+--group:背景,false
+---$color:背景色
+local bg_col = 0xffffff
 
---group:表示,true
+---$track:背景色透明度
+---min=0
+---max=100
+---step=0.01
+local bg_alpha = 0
+
+---$check:元のアルファを維持
+local keep_orig_alpha = 1
+
+--group
+--group:表示,false
 ---$check:色1表示
 local col1_visible = 1
 
@@ -66,7 +83,7 @@ local col2_visible = 1
 local col3_visible = 1
 
 --group
---group:色,true
+--group:色,false
 ---$color:色1
 local col1 = 0x00ffff
 
@@ -77,7 +94,7 @@ local col2 = 0xff00ff
 local col3 = 0xffff00
 
 --group
---group:スクリーン角度,true
+--group:スクリーン角度,false
 ---$track:色1スクリーン角度
 ---min=-360
 ---max=360
@@ -135,6 +152,7 @@ end
 
 local n = obj.setanchor("track", 0, "line")
 
+-- PI
 size = tonumber(PI[1]) or size
 local col1_dot_size = to_number_from_table(PI[2], 1, dot_size)
 local col2_dot_size = to_number_from_table(PI[2], 2, dot_size)
@@ -157,15 +175,23 @@ col3_visible = (type(PI[6]) == "table") and as_number(PI[6][3], col3_visible) or
 col1 = to_number_from_table(PI[7], 1, col1)
 col2 = to_number_from_table(PI[7], 2, col2)
 col3 = to_number_from_table(PI[7], 3, col3)
-smoothness = tonumber(PI[8]) or smoothness
-fusion = math.max(0, tonumber(PI[9]) or fusion)
-shape = tonumber(PI[10]) or shape
-offset_type = as_number(PI[11], offset_type)
-bg_transparent = as_number(PI[12], bg_transparent)
-size = math.max(0, size)
+bg_col = tonumber(PI[8]) or bg_col
+bg_alpha = tonumber(PI[9]) or bg_alpha
+keep_orig_alpha = as_number(PI[10], keep_orig_alpha)
+smoothness = tonumber(PI[11]) or smoothness
+fusion = tonumber(PI[12]) or fusion
+shape = tonumber(PI[13]) or shape
+mixing_mode = tonumber(PI[14]) or mixing_mode
+offset_type = as_number(PI[15], offset_type)
+
+-- 値の制限
+size = math.max(1, size)
 dot_size = math.max(0, dot_size)
+bg_alpha = math.max(0, math.min(100, bg_alpha))
 smoothness = math.max(0, math.min(5, smoothness))
-shape = (0 <= shape and shape < 8) and shape or 0
+fusion = math.max(0, fusion)
+shape = math.floor(math.max(0, math.min(7, shape)))
+mixing_mode = math.floor(math.max(0, math.min(1, mixing_mode)))
 
 if shape == 1 then
     col1_dot_angle = col1_dot_angle + 45
@@ -200,6 +226,7 @@ size = obj.w * 0.25 * ((100 - size) / 100)
 local r1, g1, b1 = RGB(col1)
 local r2, g2, b2 = RGB(col2)
 local r3, g3, b3 = RGB(col3)
+local r4, g4, b4 = RGB(bg_col)
 local PAD = 0.0
 
 obj.effect("ぼかし", "範囲", smoothness, "縦横比", 0, "光の強さ", 0, "サイズ固定", 1)
@@ -209,8 +236,8 @@ obj.pixelshader("psmain", "object", {"object"},
         shape, col1_dot_size / 100, col2_dot_size / 100, col3_dot_size / 100,
 
         col1_x, col1_y, col2_x, col2_y,
-        col3_x, col3_y, offset_type, bg_transparent,
-        fusion / 100, PAD, PAD, PAD,
+        col3_x, col3_y, offset_type, keep_orig_alpha,
+        fusion / 100, mixing_mode, PAD, PAD,
 
         col1_s_m00, col1_s_m01, PAD, PAD,
         col1_s_m10, col1_s_m11, PAD, PAD,
@@ -230,6 +257,7 @@ obj.pixelshader("psmain", "object", {"object"},
         r1 / 255, g1 / 255, b1 / 255, col1_visible,
         r2 / 255, g2 / 255, b2 / 255, col2_visible,
         r3 / 255, g3 / 255, b3 / 255, col3_visible,
+        r4 / 255, g4 / 255, b4 / 255, (100 - bg_alpha) / 100,
     },
     "copy", "clamp"
 )

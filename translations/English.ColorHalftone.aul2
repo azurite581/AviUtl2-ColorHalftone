@@ -14,8 +14,14 @@
 星型=Star
 ハート=Heart
 線=Stripe
+混色方法=Mixing Mode
+減法混色=Subtractive Mixing
+加法混色=Additive Mixing
 段違い=Uneven
-背景色透過=Transparent Background Color
+背景=Background
+背景色=Bg Color
+背景色透明度=Bg Opacity
+元のアルファを維持=Keep Original Alpha
 表示=Display
 色1表示=Display Color1
 色2表示=Display Color2

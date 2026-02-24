@@ -12,9 +12,10 @@ cbuffer constant0 : register(b0) {
     float2 col2_center_pos;
     float2 col3_center_pos;
     float offset_type;
-    float bg_transparent;
+    float keep_orig_alpha;
     float fusion;
-    float3 pad;
+    float mixing_mode;
+    float2 pad;
     float2x2 col1_screen_angle;
     float2x2 col1_dot_angle;
     float2x2 col2_screen_angle;
@@ -27,6 +28,7 @@ cbuffer constant0 : register(b0) {
     float col2_visible;
     float3 col3;
     float col3_visible;
+    float4 bg_col;
 }
 
 // 2D SDF functions (https://iquilezles.org/articles/distfunctions2d/) by Inigo Quilez
@@ -48,20 +50,20 @@ float sdEquilateralTriangle(in float2 p, in float r)
 {
     const float k = sqrt(3.0);
     p.x = abs(p.x) - r;
-    p.y = p.y + r/k;
-    if( p.x+k*p.y>0.0 ) p = float2(p.x-k*p.y,-k*p.x-p.y)/2.0;
-    p.x -= clamp( p.x, -2.0*r, 0.0 );
-    return -length(p)*sign(p.y);
+    p.y = p.y + r / k;
+    if( p.x + k * p.y > 0.0 ) p = float2(p.x - k*p.y, -k * p.x - p.y) / 2.0;
+    p.x -= clamp( p.x, -2.0 * r, 0.0 );
+    return -length(p) * sign(p.y);
 }
 
 float sdPentagon(in float2 p, in float r)
 {
     const float3 k = float3(0.809016994, 0.587785252, 0.726542528);
     p.x = abs(p.x);
-    p -= 2.0*min(dot(float2(-k.x,k.y),p),0.0)*float2(-k.x,k.y);
-    p -= 2.0*min(dot(float2( k.x,k.y),p),0.0)*float2( k.x,k.y);
-    p -= float2(clamp(p.x,-r*k.z,r*k.z),r);
-    return length(p)*sign(p.y);
+    p -= 2.0 * min(dot(float2(-k.x, k.y), p), 0.0) * float2(-k.x, k.y);
+    p -= 2.0 * min(dot(float2( k.x, k.y), p), 0.0) * float2( k.x, k.y);
+    p -= float2(clamp(p.x, -r * k.z, r * k.z), r);
+    return length(p) * sign(p.y);
 }
 
 float sdHexagon(in float2 p, in float r)
@@ -93,8 +95,8 @@ float sdfPentagram(in float2 p, in float r)
 
     // draw edge
     p.y -= r;
-    return length(p-v3 * clamp(dot(p,v3), 0.0, k1z * r)) // distance
-           * sign(p.y * v3.x - p.x * v3.y);              // sign
+    return length(p - v3 * clamp(dot(p,v3), 0.0, k1z * r)) // distance
+           * sign(p.y * v3.x - p.x * v3.y);                // sign
 }
 
 float dot2(in float2 v) { return dot(v, v); }
@@ -103,10 +105,10 @@ float sdHeart(in float2 p)
 {
     p.x = abs(p.x);
 
-    if(p.y+p.x > 1.0)
+    if(p.y + p.x > 1.0)
         return sqrt(dot2(p - float2(0.25, 0.75))) - sqrt(2.0) / 4.0;
     return sqrt(min(dot2(p - float2(0.00, 1.00)),
-                    dot2(p - 0.5 * max(p.x+p.y,0.0)))) * sign(p.x - p.y);
+                    dot2(p - 0.5 * max(p.x + p.y,0.0)))) * sign(p.x - p.y);
 }
 
 float3 rgb2cmy(in float3 rgb)
@@ -133,7 +135,6 @@ float4 halftone(in float2 p, in int channel, in float dot_size, in float2 center
 {
     static const float s = 1.0;  // 周期
     float4 dot_col = float4(dot_col_, 1.0);
-    static const float4 bg_col = float4(1.0, 1.0, 1.0, 0.0);
 
     float2 tone_shift = center_pos / resolution.x * screen_size;
     float2 st = p - tone_shift;
@@ -172,17 +173,18 @@ float4 halftone(in float2 p, in int channel, in float dot_size, in float2 center
 
         // 透明な部分を背景色として扱う
         float3 tex_rgb = lerp(bg_col.rgb, tex_col.rgb, tex_col.a);
-        float3 cmy = rgb2cmy(tex_rgb);
+        tex_rgb = (mixing_mode > 0.5) ? tex_rgb : rgb2cmy(tex_rgb);
 
         float value = 0.0;
         switch (channel) {
-            case 0: value = cmy.r; break;
-            case 1: value = cmy.g; break;
-            case 2: value = cmy.b; break;
-            default: value = cmy.r; break;
+            case 0: value = tex_rgb.r; break;
+            case 1: value = tex_rgb.g; break;
+            case 2: value = tex_rgb.b; break;
+            default: value = tex_rgb.r; break;
         }
 
         value = clamp(value, 0.0, 1.0);
+        if (mixing_mode > 0.5) value = pow(value, 2.2);  // 加法混色の場合は Linear sRGB にする
         size = sqrt(value) * 0.5 * s;
 
         float d = 1e20;
@@ -304,7 +306,8 @@ float4 halftone(in float2 p, in int channel, in float dot_size, in float2 center
         float opacity = smoothstep(0.0, aa_width * AA_WIDTH_FACTOR, shape_size * dot_size);
         blend = 1.0 - (1.0 - blend) * opacity;
     }
-    return lerp(dot_col, bg_col, blend);
+
+    return lerp(dot_col, float4(bg_col.rgb, 0.0), blend);
 }
 
 float4 psmain(float4 pos : SV_Position) : SV_Target
@@ -318,18 +321,21 @@ float4 psmain(float4 pos : SV_Position) : SV_Target
     float4 m = halftone(uv, 1, col2_dot_size, col2_center_pos, col2_screen_angle, col2_dot_angle, col2, offset_type);
     float4 y = halftone(uv, 2, col3_dot_size, col3_center_pos, col3_screen_angle, col3_dot_angle, col3, offset_type);
 
-    c = (col1_visible == 1) ? c : float4(1.0, 1.0, 1.0, (bg_transparent > 0.5 ? 0.0 : 1.0));
-    m = (col2_visible == 1) ? m : float4(1.0, 1.0, 1.0, (bg_transparent > 0.5 ? 0.0 : 1.0));
-    y = (col3_visible == 1) ? y : float4(1.0, 1.0, 1.0, (bg_transparent > 0.5 ? 0.0 : 1.0));
+    c = (col1_visible == 1) ? c : float4(bg_col.rgb, 0.0);
+    m = (col2_visible == 1) ? m : float4(bg_col.rgb, 0.0);
+    y = (col3_visible == 1) ? y : float4(bg_col.rgb, 0.0);
 
-    float3 blended_rgb = min(min(c.rgb, m.rgb), y.rgb);
+    float3 blended_rgb = (mixing_mode > 0.5) ? max(max(c.rgb, m.rgb), y.rgb) : min(min(c.rgb, m.rgb), y.rgb);
     float dot_alpha = max(max(c.a, m.a), y.a);
 
-    if (bg_transparent > 0.5) {
-        float3 final_rgb = blended_rgb - (1.0 - dot_alpha);
-        final_rgb = max(final_rgb, 0.0);
-        return float4(final_rgb * tex_alpha, dot_alpha * tex_alpha);
-    } else {
-        return float4(blended_rgb * tex_alpha, tex_alpha);
-    }
+    float3 final_rgb = blended_rgb - bg_col.rgb * (1.0 - bg_col.a) * (1.0 - dot_alpha);
+    final_rgb = saturate(final_rgb);
+
+    float final_alpha = dot_alpha + bg_col.a * (1.0 - dot_alpha);
+    final_alpha = saturate(final_alpha);
+
+    final_rgb = (keep_orig_alpha > 0.5) ? final_rgb * tex_alpha : final_rgb;
+    final_alpha = (keep_orig_alpha > 0.5) ? final_alpha * tex_alpha : final_alpha;
+
+    return float4(final_rgb, final_alpha);
 }
