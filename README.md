@@ -12,6 +12,8 @@
 
 ## インストール
 
+次のいずれかの方法でインストールできます。
+
 ### AviUtl2 カタログを使う
 
 本スクリプトは [aviutl2-catalog](https://github.com/Neosku/aviutl2-catalog) に登録済みです。
